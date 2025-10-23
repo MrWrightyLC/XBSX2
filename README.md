@@ -1,3 +1,8 @@
+# This repo will be superceded by https://github.com/XboxEmulationHub/XBSX2
+
+I didn't really want to do this but the history with this repo is kinda screwed along with the fact it's not actually linked as a fork to the PCSX2 Repo. So I decided to just fork PCSX2 (under the XBSX2 name) under that new link and do everything new I'm hard at work on the next version of XBSX2 but I have no idea when it's going to come out. If anyone has any questions regarding this please feel free to reach out in the Discord (https://discord.gg/WCmxvvxHqu) until then see you on 2.0.8.5 in the new repo :) 
+
+Original README.md:
 # XBSX2 UWP
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/XboxEmulationHub/XBSX2/buildwinrt.yml)
