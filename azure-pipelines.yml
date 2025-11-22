@@ -1,0 +1,103 @@
+trigger:
+- dev
+
+pr:
+  branches:
+    include:
+      - dev
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  solution: 'PCSX2_qt.sln'
+  buildPlatform: 'x64'
+  appxManifest: 'pcsx2-winrt\\Package.appxmanifest'
+  artifactName: 'msix'
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildMatrix
+    displayName: 'Build MSIX Packages'
+    strategy:
+      matrix:
+        Release:
+          buildConfiguration: 'Release'
+        ReleaseAVX2:
+          buildConfiguration: 'Release AVX2'
+
+    steps:
+    - checkout: self
+      persistCredentials: true
+
+    - task: NuGetToolInstaller@1
+
+    - task: NuGetCommand@2
+      inputs:
+        restoreSolution: '$(solution)'
+
+    - task: PowerShell@2
+      name: ExtractVersion
+      inputs:
+        targetType: 'inline'
+        script: |
+          [xml]$manifest = Get-Content "$(appxManifest)"
+          $version = $manifest.Package.Identity.Version
+          Write-Host "##vso[task.setvariable variable=AppVersion]$version"
+          Write-Host "Extracted AppVersion: $version"
+
+    - script: |
+        cd bin\resources
+        curl -L -O "https://github.com/PCSX2/pcsx2_patches/releases/download/latest/patches.zip"
+      displayName: 'Download Patches'
+
+    - script: |
+        curl -L -O "https://github.com/XboxEmulationHub/xbsx2-dependencies/releases/download/latest-windows-dependencies-dev/xbsx2-dependencies-dev.7z"
+        7z x xbsx2-dependencies-dev.7z -o"./"
+      displayName: 'Download & Extract Dependencies'
+
+    - task: VSBuild@1
+      inputs:
+        solution: '$(solution)'
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
+        msbuildArgs: >
+          /p:GenerateAppxPackageOnBuild=true
+          /p:AppxPackageDir=$(Build.ArtifactStagingDirectory)\AppPackages\
+          /p:PlatformToolset=v143
+      displayName: 'Build Project'
+
+    - task: PowerShell@2
+      name: SetPackagePath
+      inputs:
+        targetType: 'inline'
+        script: |
+          $config = "$(buildConfiguration)"
+          $version = "$(AppVersion)"
+          $suffix = if ($config -eq 'Release AVX2') { '_Release AVX2' } else { '' }
+          $path = "AppPackages\xbsx2\xbsx2_${version}_x64${suffix}_Test"
+          Write-Host "Resolved PackagePath: $path"
+          Write-Host "##vso[task.setvariable variable=PackagePath]$path"
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(PackagePath)'
+        ArtifactName: '$(artifactName)-$(buildConfiguration)'
+        publishLocation: 'Container'
+      displayName: 'Upload MSIX Artifact'
+
+    # Optional: Commit and push changes back to dev branch
+    - script: |
+        git config user.name "Azure DevOps CI"
+        git config user.email "azuredevops@example.com"
+        git checkout dev
+        # Example: touch a file or modify something if needed
+        # echo "Build completed at $(Build.BuildId)" >> build_log.txt
+        # git add build_log.txt
+        # git commit -m "CI: Build $(Build.BuildId)"
+        # git push origin dev
+      displayName: 'Commit and push changes to dev branch'
+      condition: false  # Disable by default, enable if needed
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
